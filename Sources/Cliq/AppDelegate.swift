@@ -238,6 +238,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self, self.isEnabled else { return }
             switch event.type {
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+                // A physical button can't go down twice without an intervening mouseUp, so a
+                // second mouseDown while one is already pending is a spurious duplicate event
+                // (some trackpads/tap gestures occasionally send these) — ignore it rather than
+                // retriggering the press sound.
+                guard self.pendingPresses[event.buttonNumber] == nil else { return }
                 if let player = self.play(self.pressPool, volume: self.volume) {
                     self.pendingPresses[event.buttonNumber] = (Date(), player)
                 }
