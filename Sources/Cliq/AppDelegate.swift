@@ -210,9 +210,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tapPool = PlayerPool(resource: pack.fullResource, poolSize: poolSize)
     }
 
+    // A hard .stop() chops the waveform mid-sample and pops. Fading out over a few
+    // milliseconds instead makes cutting a sound short inaudible as a discontinuity.
+    private let cutoffFadeDuration: TimeInterval = 0.012
+
+    private func stopSmoothly(_ player: AVAudioPlayer?) {
+        player?.setVolume(0, fadeDuration: cutoffFadeDuration)
+    }
+
     @discardableResult
     private func play(_ pool: PlayerPool?, volume: Float) -> AVAudioPlayer? {
-        activePlayer?.stop()
+        stopSmoothly(activePlayer)
         let player = pool?.play(volume: volume)
         activePlayer = player
         return player
@@ -229,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Below this, a click is treated as a tap: the press sound is skipped entirely and only
     // the full, uncut click plays, so its attack transient doesn't land right after the
     // press sound's own transient (which read as a double click).
-    private let tapThreshold: TimeInterval = 0.035
+    private let tapThreshold: TimeInterval = 0.025
     private var pendingPresses: [Int: PendingPress] = [:]
 
     private func setupGlobalMonitor() {
@@ -253,10 +261,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let pending = self.pendingPresses.removeValue(forKey: button) else { return }
                 if Date().timeIntervalSince(pending.date) < self.tapThreshold {
                     pending.workItem?.cancel()
-                    pending.player?.stop()
+                    self.stopSmoothly(pending.player)
                     self.play(self.tapPool, volume: self.volume)
                 } else {
-                    pending.player?.stop()
+                    self.stopSmoothly(pending.player)
                     self.play(self.releasePool, volume: self.volume)
                 }
             default:
