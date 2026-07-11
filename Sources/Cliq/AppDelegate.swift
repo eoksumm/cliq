@@ -207,6 +207,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Global mouse monitoring
 
+    // Trackpad taps (Tap to Click) fire mouseDown/mouseUp almost instantly, so the press
+    // and release sounds would start on top of each other and mush together. A real held
+    // click has a natural gap between down and up, so below this threshold we treat it as
+    // a tap and skip the release sound.
+    private let tapThreshold: TimeInterval = 0.08
+    private var pressTimestamps: [Int: Date] = [:]
+
     private func setupGlobalMonitor() {
         globalMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp]
@@ -214,9 +221,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self, self.isEnabled else { return }
             switch event.type {
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+                self.pressTimestamps[event.buttonNumber] = Date()
                 self.pressPool?.play(volume: self.volume)
             case .leftMouseUp, .rightMouseUp, .otherMouseUp:
-                self.releasePool?.play(volume: self.volume)
+                let pressedAt = self.pressTimestamps.removeValue(forKey: event.buttonNumber)
+                let wasTap = pressedAt.map { Date().timeIntervalSince($0) < self.tapThreshold } ?? false
+                if !wasTap {
+                    self.releasePool?.play(volume: self.volume)
+                }
             default:
                 break
             }

@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="Cliq"
-BUNDLE_ID="com.redhex.cliq"
+BUNDLE_ID="com.eoksumm.cliq"
 APP_DIR="${APP_NAME}.app"
 
 echo "==> Building release binary..."
