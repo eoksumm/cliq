@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var pressPool: PlayerPool?
     private var releasePool: PlayerPool?
     private var tapPool: PlayerPool?
+    private var activePlayer: AVAudioPlayer?
 
     private let soundPacks: [SoundPack] = [
         SoundPack(id: "click1", name: "Click 1", pressResource: "click1_press", releaseResource: "click1_release", fullResource: "click1_full"),
@@ -183,7 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               let pack = soundPacks.first(where: { $0.id == id }) else { return }
         defaults.set(pack.id, forKey: packKey)
         loadPools(for: pack)
-        tapPool?.play(volume: volume) // preview
+        play(tapPool, volume: volume) // preview
     }
 
     @objc private func toggleLoginItem() {
@@ -210,6 +211,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tapPool = PlayerPool(resource: pack.fullResource, poolSize: poolSize)
     }
 
+    // Only one click sound should ever be audible at a time. Starting a new one always
+    // cuts off whatever is still playing, so fast repeated clicks stay crisp instead of
+    // stacking up into a mush of overlapping audio.
+    @discardableResult
+    private func play(_ pool: PlayerPool?, volume: Float) -> AVAudioPlayer? {
+        activePlayer?.stop()
+        let player = pool?.play(volume: volume)
+        activePlayer = player
+        return player
+    }
+
     // MARK: - Global mouse monitoring
 
     // Trackpad taps (Tap to Click) fire mouseDown/mouseUp almost instantly, so the press
@@ -226,16 +238,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self, self.isEnabled else { return }
             switch event.type {
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-                if let player = self.pressPool?.play(volume: self.volume) {
+                if let player = self.play(self.pressPool, volume: self.volume) {
                     self.pendingPresses[event.buttonNumber] = (Date(), player)
                 }
             case .leftMouseUp, .rightMouseUp, .otherMouseUp:
                 guard let pending = self.pendingPresses.removeValue(forKey: event.buttonNumber) else { return }
                 pending.player.stop() // never let the press sound bleed into whatever plays next
                 if Date().timeIntervalSince(pending.date) < self.tapThreshold {
-                    self.tapPool?.play(volume: self.volume)
+                    self.play(self.tapPool, volume: self.volume)
                 } else {
-                    self.releasePool?.play(volume: self.volume)
+                    self.play(self.releasePool, volume: self.volume)
                 }
             default:
                 break
