@@ -8,10 +8,17 @@ A menu bar app for macOS that plays a click sound whenever you click your mouse 
 
 Download the latest `.dmg` from the [Releases](https://github.com/eoksumm/cliq/releases) page, open it, and drag Cliq into Applications.
 
-The app isn't signed with an Apple Developer certificate, so macOS will block it the first time you open it. To allow it:
+Cliq isn't signed with a paid Apple Developer certificate, so macOS will block it the first time you open it with a message like "Apple could not verify Cliq is free of malware." This is normal for free/open-source apps distributed outside the App Store, not a sign anything's wrong. To allow it:
 
-1. Try to open Cliq (you'll get a warning).
+1. Try to open Cliq, it'll get blocked.
 2. Go to System Settings > Privacy & Security, scroll down, and click "Open Anyway" next to the Cliq message.
+3. Confirm "Open" in the dialog that appears.
+
+If you'd rather use the Terminal, this removes the quarantine flag and skips the dialogs entirely:
+
+```
+xattr -dr com.apple.quarantine /Applications/Cliq.app
+```
 
 Cliq runs from the menu bar only, there's no dock icon or window.
 
