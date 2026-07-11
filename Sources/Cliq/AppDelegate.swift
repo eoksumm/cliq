@@ -229,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Below this, a click is treated as a tap: the press sound is skipped entirely and only
     // the full, uncut click plays, so its attack transient doesn't land right after the
     // press sound's own transient (which read as a double click).
-    private let tapThreshold: TimeInterval = 0.08
+    private let tapThreshold: TimeInterval = 0.035
     private var pendingPresses: [Int: PendingPress] = [:]
 
     private func setupGlobalMonitor() {
