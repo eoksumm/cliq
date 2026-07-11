@@ -7,6 +7,7 @@ struct SoundPack {
     let name: String
     let pressResource: String
     let releaseResource: String
+    let fullResource: String
 }
 
 // A small round-robin pool so rapid repeated clicks don't cut each other's playback off.
@@ -27,12 +28,14 @@ final class PlayerPool {
         guard !players.isEmpty else { return nil }
     }
 
-    func play(volume: Float) {
+    @discardableResult
+    func play(volume: Float) -> AVAudioPlayer {
         let player = players[nextIndex]
         nextIndex = (nextIndex + 1) % players.count
         player.volume = volume
         player.currentTime = 0
         player.play()
+        return player
     }
 }
 
@@ -44,11 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var pressPool: PlayerPool?
     private var releasePool: PlayerPool?
+    private var tapPool: PlayerPool?
 
     private let soundPacks: [SoundPack] = [
-        SoundPack(id: "click1", name: "Click 1", pressResource: "click1_press", releaseResource: "click1_release"),
-        SoundPack(id: "click2", name: "Click 2", pressResource: "click2_press", releaseResource: "click2_release"),
-        SoundPack(id: "click3", name: "Click 3", pressResource: "click3_press", releaseResource: "click3_release"),
+        SoundPack(id: "click1", name: "Click 1", pressResource: "click1_press", releaseResource: "click1_release", fullResource: "click1_full"),
+        SoundPack(id: "click2", name: "Click 2", pressResource: "click2_press", releaseResource: "click2_release", fullResource: "click2_full"),
+        SoundPack(id: "click3", name: "Click 3", pressResource: "click3_press", releaseResource: "click3_release", fullResource: "click3_full"),
     ]
 
     private let defaults = UserDefaults.standard
@@ -179,7 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               let pack = soundPacks.first(where: { $0.id == id }) else { return }
         defaults.set(pack.id, forKey: packKey)
         loadPools(for: pack)
-        pressPool?.play(volume: volume) // preview
+        tapPool?.play(volume: volume) // preview
     }
 
     @objc private func toggleLoginItem() {
@@ -203,16 +207,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func loadPools(for pack: SoundPack) {
         pressPool = PlayerPool(resource: pack.pressResource, poolSize: poolSize)
         releasePool = PlayerPool(resource: pack.releaseResource, poolSize: poolSize)
+        tapPool = PlayerPool(resource: pack.fullResource, poolSize: poolSize)
     }
 
     // MARK: - Global mouse monitoring
 
     // Trackpad taps (Tap to Click) fire mouseDown/mouseUp almost instantly, so the press
     // and release sounds would start on top of each other and mush together. A real held
-    // click has a natural gap between down and up, so below this threshold we treat it as
-    // a tap and skip the release sound.
+    // click has a natural gap between down and up. Below this threshold we treat it as a
+    // tap: cut the press sound short and play the full, uncut click sound instead.
     private let tapThreshold: TimeInterval = 0.08
-    private var pressTimestamps: [Int: Date] = [:]
+    private var pendingPresses: [Int: (date: Date, player: AVAudioPlayer)] = [:]
 
     private func setupGlobalMonitor() {
         globalMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -221,12 +226,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self, self.isEnabled else { return }
             switch event.type {
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-                self.pressTimestamps[event.buttonNumber] = Date()
-                self.pressPool?.play(volume: self.volume)
+                if let player = self.pressPool?.play(volume: self.volume) {
+                    self.pendingPresses[event.buttonNumber] = (Date(), player)
+                }
             case .leftMouseUp, .rightMouseUp, .otherMouseUp:
-                let pressedAt = self.pressTimestamps.removeValue(forKey: event.buttonNumber)
-                let wasTap = pressedAt.map { Date().timeIntervalSince($0) < self.tapThreshold } ?? false
-                if !wasTap {
+                guard let pending = self.pendingPresses.removeValue(forKey: event.buttonNumber) else { return }
+                if Date().timeIntervalSince(pending.date) < self.tapThreshold {
+                    pending.player.stop()
+                    self.tapPool?.play(volume: self.volume)
+                } else {
                     self.releasePool?.play(volume: self.volume)
                 }
             default:

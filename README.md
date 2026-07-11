@@ -1,3 +1,5 @@
+<img src="Assets/AppIconSource.png" width="120" alt="Cliq logo">
+
 # Cliq
 
 A menu bar app for macOS that plays a click sound whenever you click your mouse or trackpad, anywhere on the system. Press and release each have their own sound, like a mechanical switch.
