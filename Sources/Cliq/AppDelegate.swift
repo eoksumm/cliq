@@ -231,8 +231,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             case .leftMouseUp, .rightMouseUp, .otherMouseUp:
                 guard let pending = self.pendingPresses.removeValue(forKey: event.buttonNumber) else { return }
+                pending.player.stop() // never let the press sound bleed into whatever plays next
                 if Date().timeIntervalSince(pending.date) < self.tapThreshold {
-                    pending.player.stop()
                     self.tapPool?.play(volume: self.volume)
                 } else {
                     self.releasePool?.play(volume: self.volume)
